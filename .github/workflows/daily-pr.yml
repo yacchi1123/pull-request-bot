@@ -87,7 +87,7 @@ jobs:
           gh pr edit ${{ env.EXISTING_PR }} --body-file $PR_BODY_FILE
 
           # コメントも追加
-          gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に自動更新されました。新たな変更が検出されました。"
+          gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
 
           # 一時ファイルを削除
           rm $PR_BODY_FILE $PR_LIST_FILE
