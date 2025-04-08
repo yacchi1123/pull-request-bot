@@ -80,19 +80,16 @@ jobs:
       - name: Update existing PR
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
         run: |
-          # PRの本文を生成
-          PR_BODY_FILE="pr_body.txt"
-          cat << EOF > $PR_BODY_FILE
-          ## 日次マージプルリクエスト (更新)
+          # PRの本文を生成 (テンプレートを使用)
+          PR_BODY_FILE="PR_BODY.md"
+          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
-          このプルリクエストはGitHub Actionsにより自動更新されました。
-          developブランチの変更をmasterブランチにマージします。
-
-          最終更新日時: $(date +"%Y-%m-%d %H:%M:%S")
-
-          ### 含まれるプルリクエスト:
-          ${{ env.PR_BODY }}
-          EOF
+          # テンプレートを読み込み、プレースホルダーを置換して一時ファイルに書き込む
+          # sedコマンドでenv.PR_BODYの内容を安全に置換するためにエスケープ処理を行う
+          ESCAPED_PR_BODY=$(echo "${{ env.PR_BODY }}" | sed 's/[\\/&]/\\&/g')
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \
+              -e "s|{{PR_LIST}}|${ESCAPED_PR_BODY}|" \
+              RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
 
           # PRを更新
           gh pr edit ${{ env.EXISTING_PR }} --body-file $PR_BODY_FILE
@@ -106,20 +103,17 @@ jobs:
       - name: Create new Pull Request
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'false'
         run: |
-          # PRの本文を作成
-          PR_BODY_FILE="pr_body.txt"
-          cat << EOF > $PR_BODY_FILE
-          ## 概要
-          
-          このプルリクエストはGitHub Actionsにより自動生成されました。
-          developブランチの変更をmasterブランチにマージします。
-          
-          生成日時: $(date +"%Y-%m-%d %H:%M:%S")
-          
-          ## 主な変更点:
-          ${{ env.PR_BODY }}
-          EOF
-          
+          # PRの本文を作成 (テンプレートを使用)
+          PR_BODY_FILE="PR_BODY.md"
+          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
+
+          # テンプレートを読み込み、プレースホルダーを置換して一時ファイルに書き込む
+          # sedコマンドでenv.PR_BODYの内容を安全に置換するためにエスケープ処理を行う
+          ESCAPED_PR_BODY=$(echo "${{ env.PR_BODY }}" | sed 's/[\\/&]/\\&/g')
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \
+              -e "s|{{PR_LIST}}|${ESCAPED_PR_BODY}|" \
+              RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+              
           # PRを作成
           gh pr create \
             --title "【自動生成】developからmasterへのマージ" \
