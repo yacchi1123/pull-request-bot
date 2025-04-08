@@ -30,8 +30,10 @@ jobs:
           # ブランチの差分を確認
           if [ $(git rev-list --count origin/master..origin/develop) -gt 0 ]; then
             echo "HAS_DIFF=true" >> $GITHUB_ENV
+            echo "Differences found between origin/master and origin/develop."
           else
             echo "HAS_DIFF=false" >> $GITHUB_ENV
+            echo "No differences found between origin/master and origin/develop. Skipping PR creation/update."
           fi
       
       - name: Get included PRs
