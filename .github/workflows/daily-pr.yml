@@ -74,11 +74,16 @@ jobs:
         run: |
           # PRの本文を生成 (テンプレートを使用)
           PR_BODY_FILE="PR_BODY.md"
+          PR_LIST_FILE="PR_LIST.md" # PRリスト用の一時ファイル名
           CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
-          # テンプレートを読み込み、プレースホルダーを置換して一時ファイルに書き込む
-          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \
-              -e "s|{{PR_LIST}}|${{ env.PR_LIST_MD }}|" \
+          # PRリストの内容を一時ファイルに書き出す (エスケープ不要)
+          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
+
+          # テンプレートを読み込み、sedで置換と挿入を行う
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \\
+              -e "/{{PR_LIST}}/r $PR_LIST_FILE" \\
+              -e "/{{PR_LIST}}/d" \\
               RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
 
           # PRを更新
@@ -88,26 +93,31 @@ jobs:
           gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に自動更新されました。新たな変更が検出されました。"
 
           # 一時ファイルを削除
-          rm $PR_BODY_FILE
+          rm $PR_BODY_FILE $PR_LIST_FILE
       
       - name: Create new Pull Request
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'false'
         run: |
           # PRの本文を作成 (テンプレートを使用)
           PR_BODY_FILE="PR_BODY.md"
+          PR_LIST_FILE="PR_LIST.md" # PRリスト用の一時ファイル名
           CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
-          # テンプレートを読み込み、プレースホルダーを置換して一時ファイルに書き込む
-          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \
-              -e "s|{{PR_LIST}}|${{ env.PR_LIST_MD }}|" \
+          # PRリストの内容を一時ファイルに書き出す
+          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
+
+          # テンプレートを読み込み、sedで置換と挿入を行う
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \\
+              -e "/{{PR_LIST}}/r $PR_LIST_FILE" \\
+              -e "/{{PR_LIST}}/d" \\
               RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
-              
+
           # PRを作成
-          gh pr create \
-            --title "【自動生成】developからmasterへのマージ" \
-            --body-file $PR_BODY_FILE \
-            --base master \
+          gh pr create \\
+            --title "【自動生成】developからmasterへのマージ" \\
+            --body-file $PR_BODY_FILE \\
+            --base master \\
             --head develop
-            
+
           # 一時ファイルを削除
-          rm $PR_BODY_FILE 
+          rm $PR_BODY_FILE $PR_LIST_FILE 
