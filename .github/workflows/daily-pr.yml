@@ -27,7 +27,7 @@ jobs:
       - name: Check for differences between develop and master
         id: check_diff
         run: |
-          git fetch origin develop master
+          # ブランチの差分を確認
           if [ $(git rev-list --count master..develop) -gt 0 ]; then
             echo "HAS_DIFF=true" >> $GITHUB_ENV
           else
