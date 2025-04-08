@@ -80,28 +80,28 @@ jobs:
       - name: Update existing PR
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
         run: |
-          # 既存のPRを更新（コメントを追加）
-          CURRENT_DATE=$(date +"%Y-%m-%d")
-          
-          # 既存PRの本文を取得
-          CURRENT_BODY=$(gh pr view ${{ env.EXISTING_PR }} --json body --jq '.body')
-          
-          # 更新内容を追加
-          echo "${CURRENT_BODY}" > pr_body.txt
-          echo "" >> pr_body.txt
-          echo "## 更新: ${CURRENT_DATE}" >> pr_body.txt
-          echo "" >> pr_body.txt
-          echo "### 含まれるプルリクエスト:" >> pr_body.txt
-          echo "${{ env.PR_BODY }}" >> pr_body.txt
-          
+          # PRの本文を生成
+          PR_BODY_FILE="pr_body.txt"
+          cat << EOF > $PR_BODY_FILE
+          ## 日次マージプルリクエスト (更新)
+
+          このプルリクエストはGitHub Actionsにより自動更新されました。
+          developブランチの変更をmasterブランチにマージします。
+
+          最終更新日時: $(date +"%Y-%m-%d %H:%M:%S")
+
+          ### 含まれるプルリクエスト:
+          ${{ env.PR_BODY }}
+          EOF
+
           # PRを更新
-          gh pr edit ${{ env.EXISTING_PR }} --body-file pr_body.txt
-          
+          gh pr edit ${{ env.EXISTING_PR }} --body-file $PR_BODY_FILE
+
           # コメントも追加
           gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に自動更新されました。新たな変更が検出されました。"
-          
+
           # 一時ファイルを削除
-          rm pr_body.txt
+          rm $PR_BODY_FILE
       
       - name: Create new Pull Request
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'false'
@@ -109,20 +109,20 @@ jobs:
           # PRの本文を作成
           PR_BODY_FILE="pr_body.txt"
           cat << EOF > $PR_BODY_FILE
-          ## 日次マージプルリクエスト
+          ## 概要
           
           このプルリクエストはGitHub Actionsにより自動生成されました。
           developブランチの変更をmasterブランチにマージします。
           
           生成日時: $(date +"%Y-%m-%d %H:%M:%S")
           
-          ### 含まれるプルリクエスト:
+          ## 主な変更点:
           ${{ env.PR_BODY }}
           EOF
           
           # PRを作成
           gh pr create \
-            --title "【自動生成】developからmasterへの日次マージ" \
+            --title "【自動生成】developからmasterへのマージ" \
             --body-file $PR_BODY_FILE \
             --base master \
             --head develop
