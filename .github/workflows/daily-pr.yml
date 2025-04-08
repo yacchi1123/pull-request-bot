@@ -80,11 +80,8 @@ jobs:
           # PRリストの内容を一時ファイルに書き出す
           echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
 
-          # テンプレートを読み込み、sedで置換と挿入を行う
-          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \\
-              -e "/{{PR_LIST}}/r $PR_LIST_FILE" \\
-              -e "/{{PR_LIST}}/d" \\
-              .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+          # テンプレートを読み込み、sedで置換と挿入を行う (1行に修正)
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
 
           # PRを更新
           gh pr edit ${{ env.EXISTING_PR }} --body-file $PR_BODY_FILE
@@ -106,11 +103,8 @@ jobs:
           # PRリストの内容を一時ファイルに書き出す
           echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
 
-          # テンプレートを読み込み、sedで置換と挿入を行う
-          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \\
-              -e "/{{PR_LIST}}/r $PR_LIST_FILE" \\
-              -e "/{{PR_LIST}}/d" \\
-              .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+          # テンプレートを読み込み、sedで置換と挿入を行う (1行に修正)
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
 
           # PRを作成
           gh pr create \\
