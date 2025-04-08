@@ -77,10 +77,8 @@ jobs:
           CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
           # テンプレートを読み込み、プレースホルダーを置換して一時ファイルに書き込む
-          # sedコマンドでenv.PR_BODYの内容を安全に置換するためにエスケープ処理を行う
-          ESCAPED_PR_BODY=$(echo "${{ env.PR_LIST_MD }}" | sed 's/[\\/&]/\\&/g')
           sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \
-              -e "s|{{PR_LIST}}|${ESCAPED_PR_BODY}|" \
+              -e "s|{{PR_LIST}}|${{ env.PR_LIST_MD }}|" \
               RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
 
           # PRを更新
@@ -100,10 +98,8 @@ jobs:
           CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
           # テンプレートを読み込み、プレースホルダーを置換して一時ファイルに書き込む
-          # sedコマンドでenv.PR_BODYの内容を安全に置換するためにエスケープ処理を行う
-          ESCAPED_PR_BODY=$(echo "${{ env.PR_BODY }}" | sed 's/[\\/&]/\\&/g')
           sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \
-              -e "s|{{PR_LIST}}|${ESCAPED_PR_BODY}|" \
+              -e "s|{{PR_LIST}}|${{ env.PR_LIST_MD }}|" \
               RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
               
           # PRを作成
