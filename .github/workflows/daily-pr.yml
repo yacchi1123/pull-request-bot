@@ -86,7 +86,9 @@ jobs:
           # テンプレートを読み込み、sedで置換と挿入を行う
           sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
           echo "Generated PR body file: $PR_BODY_FILE"
-          ls -l $PR_BODY_FILE $PR_LIST_FILE # デバッグ用にファイル確認
+          
+          # ファイル名を環境変数として後続ステップに渡す
+          echo "PR_BODY_FILE=$PR_BODY_FILE" >> $GITHUB_ENV
       
       - name: Update existing PR
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
@@ -94,7 +96,7 @@ jobs:
           echo "Updating existing PR #${{ env.EXISTING_PR }}"
 
           # PRを更新
-          gh pr edit ${{ env.EXISTING_PR }} --body-file $PR_BODY_FILE
+          gh pr edit ${{ env.EXISTING_PR }} --body-file ${{ env.PR_BODY_FILE }}
 
           # コメントも追加
           gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
@@ -104,19 +106,11 @@ jobs:
         run: |
           echo "Creating new PR..."
 
-          # --- デバッグログ追加 ---
-          echo "Debug: PR_BODY_FILE variable is: [$PR_BODY_FILE]"
-          echo "Debug: Checking existence and content of PR_BODY.md:"
-          ls -l PR_BODY.md || echo "Debug: PR_BODY.md not found."
-          echo "Debug: Content of PR_BODY.md:"
-          cat PR_BODY.md || echo "Debug: Failed to cat PR_BODY.md."
-          echo "--- デバッグログ終了 ---"
-          
-          # PRを作成 (ファイル名を直接指定)
-          gh pr create --title "【自動生成】developからmasterへのマージ" --body-file PR_BODY.md --base "master" --head "develop"
+          # PRを作成
+          gh pr create --title "【自動生成】developからmasterへのマージ" --body-file ${{ env.PR_BODY_FILE }} --base "master" --head "develop"
 
       - name: Cleanup temporary files
         if: always() && env.HAS_DIFF == 'true'
         run: |
           echo "Cleaning up temporary files..."
-          rm -f PR_BODY.md PR_LIST.md 
+          rm -f ${{ env.PR_BODY_FILE }} PR_LIST.md 
