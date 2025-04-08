@@ -20,15 +20,15 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
       - name: Check for differences between develop and master
         id: check_diff
         run: |
-          git fetch origin develop master
-          if [ $(git rev-list --count master..develop) -gt 0 ]; then
+          # ブランチの差分を確認
+          if [ $(git rev-list --count origin/master..origin/develop) -gt 0 ]; then
             echo "HAS_DIFF=true" >> $GITHUB_ENV
           else
             echo "HAS_DIFF=false" >> $GITHUB_ENV
