@@ -43,23 +43,15 @@ jobs:
           PR_LIST=$(git log origin/master..origin/develop --pretty=format:"%s" | grep -o "#[0-9]\+" | sort -u)
           
           # PR情報を取得してマークダウン形式でリスト化
-          PR_BODY=""
+          PR_LIST_MD=""
           for PR_NUM in $PR_LIST; do
-            PR_ID=${PR_NUM//#/}
-            if [ -n "$PR_ID" ]; then
-              PR_INFO=$(gh pr view $PR_ID --json title,number,url --jq '.title, .number, .url' 2>/dev/null || echo "")
-              if [ -n "$PR_INFO" ]; then
-                PR_TITLE=$(echo "$PR_INFO" | head -1)
-                PR_URL=$(echo "$PR_INFO" | tail -1)
-                PR_BODY="$PR_BODY\n- [$PR_TITLE]($PR_URL) ($PR_NUM)"
-              fi
-            fi
+            PR_LIST_MD="$PR_LIST_MD\n- $PR_NUM"
           done
           
           # 環境変数に設定（複数行の場合はデリミタの設定が必要）
           {
-            echo "PR_BODY<<EOF"
-            echo -e "$PR_BODY"
+            echo "PR_LIST_MD<<EOF"
+            echo -e "$PR_LIST_MD"
             echo "EOF"
           } >> $GITHUB_ENV
       
@@ -86,7 +78,7 @@ jobs:
 
           # テンプレートを読み込み、プレースホルダーを置換して一時ファイルに書き込む
           # sedコマンドでenv.PR_BODYの内容を安全に置換するためにエスケープ処理を行う
-          ESCAPED_PR_BODY=$(echo "${{ env.PR_BODY }}" | sed 's/[\\/&]/\\&/g')
+          ESCAPED_PR_BODY=$(echo "${{ env.PR_LIST_MD }}" | sed 's/[\\/&]/\\&/g')
           sed -e "s|{{CREATED_AT}}|$CREATED_AT|" \
               -e "s|{{PR_LIST}}|${ESCAPED_PR_BODY}|" \
               RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
