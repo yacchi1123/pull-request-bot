@@ -105,11 +105,7 @@ jobs:
           echo "Creating new PR..."
 
           # PRを作成
-          gh pr create \\
-            --title "【自動生成】developからmasterへのマージ" \\
-            --body-file $PR_BODY_FILE \\
-            --base master \\
-            --head develop
+          gh pr create --title "【自動生成】developからmasterへのマージ" --body-file $PR_BODY_FILE --base master --head develop
 
       - name: Cleanup temporary files
         if: always() && env.HAS_DIFF == 'true'
