@@ -27,6 +27,15 @@ jobs:
       - name: Check for differences between develop and master
         id: check_diff
         run: |
+          # デバッグ用にブランチ一覧を表示
+          echo "--- Available branches ---"
+          git branch -a
+          echo "-------------------------"
+
+          # リモートブランチ名を指定してカウント (推奨)
+          COMMIT_COUNT=$(git rev-list --count origin/master..origin/develop)
+          echo "Commits between origin/master and origin/develop: $COMMIT_COUNT"
+          
           # ブランチの差分を確認
           if [ $(git rev-list --count master..develop) -gt 0 ]; then
             echo "HAS_DIFF=true" >> $GITHUB_ENV
