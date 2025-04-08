@@ -10,6 +10,10 @@ on:
   # 手動実行も可能に
   workflow_dispatch:
 
+# ワークフローレベルで環境変数を定義
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_PERSONAL_ACCESS_TOKEN }}
+
 jobs:
   create-pull-request:
     runs-on: ubuntu-latest
@@ -33,8 +37,6 @@ jobs:
       - name: Get included PRs
         id: get_prs
         if: env.HAS_DIFF == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # developに取り込まれたPRの一覧を取得
           # コミットメッセージ(件名)にPR番号があるものを抽出
@@ -64,8 +66,6 @@ jobs:
       - name: Check for existing PR
         id: check_pr
         if: env.HAS_DIFF == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           EXISTING_PR=$(gh pr list --base master --head develop --json number --jq '.[0].number')
           if [ -n "$EXISTING_PR" ]; then
@@ -79,8 +79,6 @@ jobs:
       
       - name: Update existing PR
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # 既存のPRを更新（コメントを追加）
           CURRENT_DATE=$(date +"%Y-%m-%d")
@@ -106,7 +104,7 @@ jobs:
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'false'
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.GITHUB_TOKEN }}
           commit-message: "日次マージ: develop to master"
           title: "【自動生成】developからmasterへの日次マージ"
           body: |
