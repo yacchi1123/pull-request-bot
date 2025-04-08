@@ -72,12 +72,13 @@ jobs:
       - name: Update existing PR
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
         run: |
-          # PRの本文を生成 (テンプレートを使用)
+          # PRの本文を生成
           PR_BODY_FILE="PR_BODY.md"
           PR_LIST_FILE="PR_LIST.md" # PRリスト用の一時ファイル名
           CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
           # PRリストの内容を一時ファイルに書き出す
+          # env.PR_LIST_MDを直接読込まないのは後続処理のsedによる置換処理で改行コードによりエラーになるため
           echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
 
           # テンプレートを読み込み、sedで置換と挿入を行う (1行に修正)
@@ -101,9 +102,10 @@ jobs:
           CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
           # PRリストの内容を一時ファイルに書き出す
+          # env.PR_LIST_MDを直接読込まないのは後続処理のsedによる置換処理で改行コードによりエラーになるため
           echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
 
-          # テンプレートを読み込み、sedで置換と挿入を行う (1行に修正)
+          # テンプレートを読み込み、sedで置換と挿入を行う
           sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
 
           # PRを作成
