@@ -30,8 +30,10 @@ jobs:
           # ブランチの差分を確認
           if [ $(git rev-list --count origin/master..origin/develop) -gt 0 ]; then
             echo "HAS_DIFF=true" >> $GITHUB_ENV
+            echo "Differences found between origin/master and origin/develop."
           else
             echo "HAS_DIFF=false" >> $GITHUB_ENV
+            echo "No differences found between origin/master and origin/develop. Skipping PR creation/update."
           fi
       
       - name: Get included PRs
@@ -68,21 +70,28 @@ jobs:
             echo "No existing PR found"
             echo "PR_EXISTS=false" >> $GITHUB_ENV
           fi
+
+      - name: Generate PR Body from template
+        id: generate_body
+        if: env.HAS_DIFF == 'true'
+        run: |
+          echo "Generating PR body using template..."
+          PR_BODY_FILE="PR_BODY.md"
+          PR_LIST_FILE="PR_LIST.md"
+          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
+
+          # PRリストの内容を一時ファイルに書き出す
+          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
+
+          # テンプレートを読み込み、sedで置換と挿入を行う
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+          echo "Generated PR body file: $PR_BODY_FILE"
+          ls -l $PR_BODY_FILE $PR_LIST_FILE # デバッグ用にファイル確認
       
       - name: Update existing PR
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
         run: |
-          # PRの本文を生成
-          PR_BODY_FILE="PR_BODY.md"
-          PR_LIST_FILE="PR_LIST.md" # PRリスト用の一時ファイル名
-          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
-
-          # PRリストの内容を一時ファイルに書き出す
-          # env.PR_LIST_MDを直接読込まないのは後続処理のsedによる置換処理で改行コードによりエラーになるため
-          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
-
-          # テンプレートを読み込み、sedで置換と挿入を行う (1行に修正)
-          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+          echo "Updating existing PR #${{ env.EXISTING_PR }}"
 
           # PRを更新
           gh pr edit ${{ env.EXISTING_PR }} --body-file $PR_BODY_FILE
@@ -90,23 +99,10 @@ jobs:
           # コメントも追加
           gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
 
-          # 一時ファイルを削除
-          rm $PR_BODY_FILE $PR_LIST_FILE
-      
       - name: Create new Pull Request
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'false'
         run: |
-          # PRの本文を作成 (テンプレートを使用)
-          PR_BODY_FILE="PR_BODY.md"
-          PR_LIST_FILE="PR_LIST.md" # PRリスト用の一時ファイル名
-          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
-
-          # PRリストの内容を一時ファイルに書き出す
-          # env.PR_LIST_MDを直接読込まないのは後続処理のsedによる置換処理で改行コードによりエラーになるため
-          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
-
-          # テンプレートを読み込み、sedで置換と挿入を行う
-          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+          echo "Creating new PR..."
 
           # PRを作成
           gh pr create \\
@@ -115,5 +111,8 @@ jobs:
             --base master \\
             --head develop
 
-          # 一時ファイルを削除
-          rm $PR_BODY_FILE $PR_LIST_FILE 
+      - name: Cleanup temporary files
+        if: always() && env.HAS_DIFF == 'true'
+        run: |
+          echo "Cleaning up temporary files..."
+          rm -f PR_BODY.md PR_LIST.md 
