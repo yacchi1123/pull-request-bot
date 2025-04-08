@@ -40,26 +40,18 @@ jobs:
         run: |
           # developに取り込まれたPRの一覧を取得
           # コミットメッセージ(件名)にPR番号があるものを抽出
-          PR_LIST=$(git log master..develop --pretty=format:"%s" | grep -o "#[0-9]\+" | sort -u)
+          PR_LIST=$(git log origin/master..origin/develop --pretty=format:"%s" | grep -o "#[0-9]\+" | sort -u)
           
           # PR情報を取得してマークダウン形式でリスト化
-          PR_BODY=""
+          PR_LIST_MD=""
           for PR_NUM in $PR_LIST; do
-            PR_ID=${PR_NUM//#/}
-            if [ -n "$PR_ID" ]; then
-              PR_INFO=$(gh pr view $PR_ID --json title,number,url --jq '.title, .number, .url' 2>/dev/null || echo "")
-              if [ -n "$PR_INFO" ]; then
-                PR_TITLE=$(echo "$PR_INFO" | head -1)
-                PR_URL=$(echo "$PR_INFO" | tail -1)
-                PR_BODY="$PR_BODY\n- [$PR_TITLE]($PR_URL) ($PR_NUM)"
-              fi
-            fi
+            PR_LIST_MD="$PR_LIST_MD\n- $PR_NUM"
           done
           
           # 環境変数に設定（複数行の場合はデリミタの設定が必要）
           {
-            echo "PR_BODY<<EOF"
-            echo -e "$PR_BODY"
+            echo "PR_LIST_MD<<EOF"
+            echo -e "$PR_LIST_MD"
             echo "EOF"
           } >> $GITHUB_ENV
       
@@ -80,46 +72,48 @@ jobs:
       - name: Update existing PR
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
         run: |
-          # 既存のPRを更新（コメントを追加）
-          CURRENT_DATE=$(date +"%Y-%m-%d")
-          
-          # 既存PRの本文を取得
-          CURRENT_BODY=$(gh pr view ${{ env.EXISTING_PR }} --json body --jq '.body')
-          
-          # 更新内容を追加
-          echo "${CURRENT_BODY}" > pr_body.txt
-          echo "" >> pr_body.txt
-          echo "## 更新: ${CURRENT_DATE}" >> pr_body.txt
-          echo "" >> pr_body.txt
-          echo "### 含まれるプルリクエスト:" >> pr_body.txt
-          echo "${{ env.PR_BODY }}" >> pr_body.txt
-          
+          # PRの本文を生成
+          PR_BODY_FILE="PR_BODY.md"
+          PR_LIST_FILE="PR_LIST.md" # PRリスト用の一時ファイル名
+          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
+
+          # PRリストの内容を一時ファイルに書き出す
+          # env.PR_LIST_MDを直接読込まないのは後続処理のsedによる置換処理で改行コードによりエラーになるため
+          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
+
+          # テンプレートを読み込み、sedで置換と挿入を行う (1行に修正)
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+
           # PRを更新
-          gh pr edit ${{ env.EXISTING_PR }} --body-file pr_body.txt
-          
+          gh pr edit ${{ env.EXISTING_PR }} --body-file $PR_BODY_FILE
+
           # コメントも追加
-          gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に自動更新されました。新たな変更が検出されました。"
+          gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
+
+          # 一時ファイルを削除
+          rm $PR_BODY_FILE $PR_LIST_FILE
       
       - name: Create new Pull Request
         if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'false'
         run: |
-          # PRの本文を作成
-          PR_BODY_FILE="pr_body.txt"
-          cat << EOF > $PR_BODY_FILE
-          ## 日次マージプルリクエスト
-          
-          このプルリクエストはGitHub Actionsにより自動生成されました。
-          developブランチの変更をmasterブランチにマージします。
-          
-          生成日時: $(date +"%Y-%m-%d %H:%M:%S")
-          
-          ### 含まれるプルリクエスト:
-          ${{ env.PR_BODY }}
-          EOF
-          
+          # PRの本文を作成 (テンプレートを使用)
+          PR_BODY_FILE="PR_BODY.md"
+          PR_LIST_FILE="PR_LIST.md" # PRリスト用の一時ファイル名
+          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
+
+          # PRリストの内容を一時ファイルに書き出す
+          # env.PR_LIST_MDを直接読込まないのは後続処理のsedによる置換処理で改行コードによりエラーになるため
+          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
+
+          # テンプレートを読み込み、sedで置換と挿入を行う
+          sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
+
           # PRを作成
-          gh pr create \
-            --title "【自動生成】developからmasterへの日次マージ" \
-            --body-file $PR_BODY_FILE \
-            --base master \
-            --head develop 
+          gh pr create \\
+            --title "【自動生成】developからmasterへのマージ" \\
+            --body-file $PR_BODY_FILE \\
+            --base master \\
+            --head develop
+
+          # 一時ファイルを削除
+          rm $PR_BODY_FILE $PR_LIST_FILE 
