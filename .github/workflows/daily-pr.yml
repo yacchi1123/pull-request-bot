@@ -24,7 +24,7 @@ jobs:
       pr_body_file: ${{ steps.generate_body.outputs.pr_body_file }} # Use the correct output name
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0 # Required for git log/diff
       
