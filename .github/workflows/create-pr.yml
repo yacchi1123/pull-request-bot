@@ -1,0 +1,53 @@
+# .github/workflows/create-pr.yml
+name: Create Pull Request
+
+on:
+  workflow_call:
+    inputs:
+      pr-title:
+        description: 'Pull Request title'
+        required: true
+        type: string
+      pr-body-file:
+        description: 'Path to the file containing the PR body'
+        required: true
+        type: string
+      base-branch:
+        description: 'The branch to merge into'
+        required: true
+        type: string
+      head-branch:
+        description: 'The branch to merge from'
+        required: true
+        type: string
+    secrets:
+      github-token:
+        description: 'GitHub token for authentication'
+        required: true
+
+jobs:
+  create_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        # We might need fetch-depth: 0 if gh cli needs full history, but let's try without first.
+
+      - name: Download PR body artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-body-artifact
+          path: . # Download to current directory
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.github-token }}
+        run: |
+          echo "Creating new PR..."
+          gh pr create --title "${{ inputs.pr-title }}" --body-file "${{ inputs.pr-body-file }}" --base "${{ inputs.base-branch }}" --head "${{ inputs.head-branch }}"
+
+      - name: Cleanup temporary body file
+        if: always()
+        run: |
+          echo "Cleaning up PR body file..."
+          rm -f "${{ inputs.pr-body-file }}" 
