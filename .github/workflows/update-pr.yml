@@ -1,0 +1,50 @@
+# .github/workflows/update-pr.yml
+name: Update Pull Request
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        description: 'The number of the existing Pull Request'
+        required: true
+        type: string
+      pr-body-file:
+        description: 'Path to the file containing the PR body'
+        required: true
+        type: string
+    secrets:
+      github-token:
+        description: 'GitHub token for authentication'
+        required: true
+
+jobs:
+  update_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        # We might need fetch-depth: 0 if gh cli needs full history, but let's try without first.
+
+      - name: Download PR body artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-body-artifact
+          path: . # Download to current directory
+
+      - name: Update Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.github-token }}
+        run: |
+          echo "Updating existing PR #${{ inputs.pr-number }}"
+
+          # PR本文を更新
+          gh pr edit ${{ inputs.pr-number }} --body-file "${{ inputs.pr-body-file }}"
+
+          # 更新コメントを追加
+          gh pr comment ${{ inputs.pr-number }} --body "$(date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
+
+      - name: Cleanup temporary body file
+        if: always()
+        run: |
+          echo "Cleaning up PR body file..."
+          rm -f "${{ inputs.pr-body-file }}" 

@@ -15,33 +15,36 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  create-pull-request:
+  prepare-pr-data:
     runs-on: ubuntu-latest
-    
+    outputs:
+      has_diff: ${{ steps.check_diff.outputs.has_diff }}
+      pr_exists: ${{ steps.check_pr.outputs.pr_exists }}
+      existing_pr_number: ${{ steps.check_pr.outputs.existing_pr_number }}
+      pr_body_file: ${{ steps.generate_body.outputs.pr_body_file }} # Use the correct output name
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Required for git log/diff
       
       - name: Check for differences between develop and master
         id: check_diff
         run: |
           # ブランチの差分を確認
           if [ $(git rev-list --count origin/master..origin/develop) -gt 0 ]; then
-            echo "HAS_DIFF=true" >> $GITHUB_ENV
+            echo "has_diff=true" >> $GITHUB_OUTPUT
             echo "Differences found between origin/master and origin/develop."
           else
-            echo "HAS_DIFF=false" >> $GITHUB_ENV
-            echo "No differences found between origin/master and origin/develop. Skipping PR creation/update."
+            echo "has_diff=false" >> $GITHUB_OUTPUT
+            echo "No differences found between origin/master and origin/develop. Skipping."
           fi
       
       - name: Get included PRs
         id: get_prs
-        if: env.HAS_DIFF == 'true'
+        if: steps.check_diff.outputs.has_diff == 'true'
         run: |
           # developに取り込まれたPRの一覧を取得
-          # コミットメッセージ(件名)にPR番号があるものを抽出
           PR_LIST=$(git log origin/master..origin/develop --pretty=format:"%s" | grep -o "#[0-9]\+" | sort -u)
           
           # PR情報を取得してマークダウン形式でリスト化
@@ -50,67 +53,80 @@ jobs:
             PR_LIST_MD="$PR_LIST_MD\n- $PR_NUM"
           done
           
-          # 環境変数に設定（複数行の場合はデリミタの設定が必要）
-          {
-            echo "PR_LIST_MD<<EOF"
-            echo -e "$PR_LIST_MD"
-            echo "EOF"
-          } >> $GITHUB_ENV
+          # ステップ内で使用するため一時ファイルに保存
+          echo -e "$PR_LIST_MD" > PR_LIST.md
+          echo "PR list saved to PR_LIST.md"
       
       - name: Check for existing PR
         id: check_pr
-        if: env.HAS_DIFF == 'true'
+        if: steps.check_diff.outputs.has_diff == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           EXISTING_PR=$(gh pr list --base master --head develop --json number --jq '.[0].number')
           if [ -n "$EXISTING_PR" ]; then
             echo "Found existing PR: $EXISTING_PR"
-            echo "EXISTING_PR=$EXISTING_PR" >> $GITHUB_ENV
-            echo "PR_EXISTS=true" >> $GITHUB_ENV
+            echo "existing_pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "pr_exists=true" >> $GITHUB_OUTPUT
           else
             echo "No existing PR found"
-            echo "PR_EXISTS=false" >> $GITHUB_ENV
+            echo "existing_pr_number=''" >> $GITHUB_OUTPUT # Ensure output is set
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Generate PR Body from template
         id: generate_body
-        if: env.HAS_DIFF == 'true'
+        if: steps.check_diff.outputs.has_diff == 'true'
         run: |
           echo "Generating PR body using template..."
-          PR_BODY_FILE="PR_BODY.md"
-          PR_LIST_FILE="PR_LIST.md"
+          PR_BODY_FILE="pr_body_content.md" # Define filename
+          PR_LIST_FILE="PR_LIST.md" # Use file from previous step
           CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
 
-          # PRリストの内容を一時ファイルに書き出す
-          echo -e "${{ env.PR_LIST_MD }}" > $PR_LIST_FILE
+          # Ensure PR_LIST_FILE exists if generated
+          if [ ! -f $PR_LIST_FILE ]; then
+              echo "Warning: $PR_LIST_FILE not found. Creating empty file."
+              touch $PR_LIST_FILE
+          fi
 
           # テンプレートを読み込み、sedで置換と挿入を行う
           sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
           echo "Generated PR body file: $PR_BODY_FILE"
-          
-          # ファイル名を環境変数として後続ステップに渡す
-          echo "PR_BODY_FILE=$PR_BODY_FILE" >> $GITHUB_ENV
-      
-      - name: Update existing PR
-        if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'true'
+
+          # Set filename for output - Use 'pr_body_file' as the name
+          echo "pr_body_file=$PR_BODY_FILE" >> $GITHUB_OUTPUT
+
+      - name: Upload PR body as artifact
+        if: steps.check_diff.outputs.has_diff == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-body-artifact
+          path: ${{ steps.generate_body.outputs.pr_body_file }} # Use the step output directly
+
+      - name: Cleanup local temporary files
+        if: always() && steps.check_diff.outputs.has_diff == 'true'
         run: |
-          echo "Updating existing PR #${{ env.EXISTING_PR }}"
+          echo "Cleaning up local temporary files..."
+          rm -f PR_LIST.md pr_body_content.md
 
-          # PRを更新
-          gh pr edit ${{ env.EXISTING_PR }} --body-file ${{ env.PR_BODY_FILE }}
+  call-update-pr:
+    needs: prepare-pr-data
+    if: needs.prepare-pr-data.outputs.has_diff == 'true' && needs.prepare-pr-data.outputs.pr_exists == 'true'
+    uses: ./.github/workflows/update-pr.yml
+    with:
+      pr-number: ${{ needs.prepare-pr-data.outputs.existing_pr_number }}
+      pr-body-file: ${{ needs.prepare-pr-data.outputs.pr_body_file }}
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
 
-          # コメントも追加
-          gh pr comment ${{ env.EXISTING_PR }} --body "$(date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
-
-      - name: Create new Pull Request
-        if: env.HAS_DIFF == 'true' && env.PR_EXISTS == 'false'
-        run: |
-          echo "Creating new PR..."
-
-          # PRを作成
-          gh pr create --title "【自動生成】developからmasterへのマージ" --body-file ${{ env.PR_BODY_FILE }} --base "master" --head "develop"
-
-      - name: Cleanup temporary files
-        if: always() && env.HAS_DIFF == 'true'
-        run: |
-          echo "Cleaning up temporary files..."
-          rm -f ${{ env.PR_BODY_FILE }} PR_LIST.md 
+  call-create-pr:
+    needs: prepare-pr-data
+    if: needs.prepare-pr-data.outputs.has_diff == 'true' && needs.prepare-pr-data.outputs.pr_exists == 'false'
+    uses: ./.github/workflows/create-pr.yml
+    with:
+      pr-title: "【自動生成】developからmasterへのマージ"
+      pr-body-file: ${{ needs.prepare-pr-data.outputs.pr_body_file }}
+      base-branch: "master"
+      head-branch: "develop"
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }} 
