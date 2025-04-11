@@ -82,7 +82,8 @@ jobs:
           echo "Generating PR body using template..."
           PR_BODY_FILE="pr_body_content.md"
           PR_LIST_FILE="pr_list.md"
-          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
+          # 環境変数 TZ を設定して JST で日時を取得
+          CREATED_AT=$(TZ=Asia/Tokyo date +"%Y-%m-%d %H:%M:%S")
 
           # Ensure PR_LIST_FILE exists if generated
           if [ ! -f $PR_LIST_FILE ]; then
