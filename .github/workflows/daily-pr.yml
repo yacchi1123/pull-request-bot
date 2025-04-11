@@ -21,12 +21,12 @@ jobs:
       has_diff: ${{ steps.check_diff.outputs.has_diff }}
       pr_exists: ${{ steps.check_pr.outputs.pr_exists }}
       existing_pr_number: ${{ steps.check_pr.outputs.existing_pr_number }}
-      pr_body_file: ${{ steps.generate_body.outputs.pr_body_file }} # Use the correct output name
+      pr_body_file: ${{ steps.generate_body.outputs.pr_body_file }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required for git log/diff
+          fetch-depth: 0
       
       - name: Check for differences between develop and master
         id: check_diff
@@ -54,8 +54,9 @@ jobs:
           done
           
           # ステップ内で使用するため一時ファイルに保存
-          echo -e "$PR_LIST_MD" > PR_LIST.md
-          echo "PR list saved to PR_LIST.md"
+          # $GITHUB_OUTPUTなど変数に入れる形だと、後続処理のsedコマンドでの置換時に改行コードが原因でエラーとなるため
+          echo -e "$PR_LIST_MD" > pr_list.md
+          echo "PR list saved to pr_list.md"
       
       - name: Check for existing PR
         id: check_pr
@@ -79,9 +80,10 @@ jobs:
         if: steps.check_diff.outputs.has_diff == 'true'
         run: |
           echo "Generating PR body using template..."
-          PR_BODY_FILE="pr_body_content.md" # Define filename
-          PR_LIST_FILE="PR_LIST.md" # Use file from previous step
-          CREATED_AT=$(date +"%Y-%m-%d %H:%M:%S")
+          PR_BODY_FILE="pr_body_content.md"
+          PR_LIST_FILE="pr_list.md"
+          # 環境変数 TZ を設定して JST で日時を取得
+          CREATED_AT=$(TZ=Asia/Tokyo date +"%Y-%m-%d %H:%M:%S")
 
           # Ensure PR_LIST_FILE exists if generated
           if [ ! -f $PR_LIST_FILE ]; then
@@ -89,7 +91,7 @@ jobs:
               touch $PR_LIST_FILE
           fi
 
-          # テンプレートを読み込み、sedで置換と挿入を行う
+          # テンプレートを読み込み、sedでテンプレート変数を置換し、Bodyファイル出力
           sed -e "s|{{CREATED_AT}}|$CREATED_AT|" -e "/{{PR_LIST}}/r $PR_LIST_FILE" -e "/{{PR_LIST}}/d" .github/workflows/RELEASE_WORKFLOW_TEMPLATE.md > $PR_BODY_FILE
           echo "Generated PR body file: $PR_BODY_FILE"
 
@@ -101,13 +103,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pr-body-artifact
-          path: ${{ steps.generate_body.outputs.pr_body_file }} # Use the step output directly
+          path: ${{ steps.generate_body.outputs.pr_body_file }}
 
       - name: Cleanup local temporary files
         if: always() && steps.check_diff.outputs.has_diff == 'true'
         run: |
           echo "Cleaning up local temporary files..."
-          rm -f PR_LIST.md pr_body_content.md
+          rm -f pr_list.md pr_body_content.md
 
   call-update-pr:
     needs: prepare-pr-data
