@@ -41,7 +41,7 @@ jobs:
           gh pr edit ${{ inputs.pr-number }} --body-file "${{ inputs.pr-body-file }}"
 
           # 更新コメントを追加
-          gh pr comment ${{ inputs.pr-number }} --body "$(date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
+          gh pr comment ${{ inputs.pr-number }} --body "$(TZ=Asia/Tokyo date +"%Y-%m-%d %H:%M:%S") に新たな変更が検出されたので、更新しました。"
 
       - name: Cleanup temporary body file
         if: always()
