@@ -1,11 +1,10 @@
 name: Daily PR from develop to master
 
 on:
-  schedule:
-    # 平日（月-金）の深夜0:00（日本時間）に実行
-    # UTCでは前日の15:00（日本時間との差は+9時間）
-    # 曜日は1-5で月-金を表す
-    - cron: '0 15 * * 1-5'
+  # develop ブランチへのプッシュ時に実行
+  push:
+    branches:
+      - develop
   
   # 手動実行も可能に
   workflow_dispatch:
