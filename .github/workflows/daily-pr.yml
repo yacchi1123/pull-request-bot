@@ -13,12 +13,6 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-permissions:
-  id-token: write
-  contents: read
-  actions: read
-  pull-requests: write
-
 jobs:
   prepare-pr-data:
     runs-on: ubuntu-latest
