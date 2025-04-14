@@ -20,9 +20,6 @@ on:
 jobs:
   update_pr:
     runs-on: ubuntu-latest
-    permissions:
-      actions: read # actions/download-artifact@v4 で必要
-      pull-requests: write # gh pr create でPRを作成するために必要
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
