@@ -1,0 +1,11 @@
+name: Japanese Greeting
+
+on:
+  workflow_call:
+
+jobs:
+  say_konnichiwa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print konnichiwa
+        run: echo "こんにちわ" 
