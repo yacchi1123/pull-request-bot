@@ -1,0 +1,12 @@
+name: Greeting Caller Workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call_japanese_greeting:
+    uses: ./.github/workflows/japanese.yml
+
+  call_english_greeting:
+    uses: ./.github/workflows/english.yml
+    needs: call_japanese_greeting 
